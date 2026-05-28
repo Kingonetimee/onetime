@@ -2,12 +2,27 @@ import os
 import uuid
 import re
 
-from PIL import Image, ImageEnhance, ImageFilter, JpegImagePlugin, PdfImagePlugin
+from PIL import (
+    Image,
+    ImageEnhance,
+    ImageFilter,
+    JpegImagePlugin,
+    PdfImagePlugin
+)
+
 from pillow_heif import register_heif_opener
 
-from flask import Flask, render_template, request, send_from_directory
+from flask import (
+    Flask,
+    render_template,
+    request,
+    send_from_directory
+)
 
+# Enable HEIC / HEIF support
 register_heif_opener()
+
+# Load Pillow plugins
 Image.init()
 
 app = Flask(__name__)
@@ -19,21 +34,46 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 
+# =========================
+# CLEAN FILE NAME
+# =========================
+
 def clean_filename(name):
+    if not name:
+        return "onetime_document"
+
     name = name.strip().lower()
     name = re.sub(r"[^a-z0-9]+", "_", name)
+    name = name.strip("_")
+
     return name or "onetime_document"
 
+
+# =========================
+# IMAGE PROCESSING
+# =========================
 
 def scan_image(image_path):
     image = Image.open(image_path).convert("RGB")
 
+    # Resize large phone images to reduce memory and speed up PDF creation
+    image.thumbnail((1800, 1800))
+
+    # Light scan enhancement
     image = image.filter(ImageFilter.SHARPEN)
-    image = ImageEnhance.Contrast(image).enhance(1.7)
-    image = ImageEnhance.Brightness(image).enhance(1.1)
+
+    contrast = ImageEnhance.Contrast(image)
+    image = contrast.enhance(1.45)
+
+    brightness = ImageEnhance.Brightness(image)
+    image = brightness.enhance(1.08)
 
     return image.convert("RGB")
 
+
+# =========================
+# MAIN ROUTE
+# =========================
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -60,9 +100,9 @@ def index():
                 scanned_images = []
 
                 for file in files:
-                    filename = file.filename.lower()
+                    original_filename = file.filename.lower()
 
-                    if filename.endswith(allowed_formats):
+                    if original_filename.endswith(allowed_formats):
                         image_path = os.path.join(
                             UPLOAD_FOLDER,
                             f"{uuid.uuid4()}_{file.filename}"
@@ -71,7 +111,14 @@ def index():
                         file.save(image_path)
 
                         scanned_image = scan_image(image_path)
+
                         scanned_images.append(scanned_image)
+
+                        # Delete uploaded image after processing to save space
+                        try:
+                            os.remove(image_path)
+                        except Exception:
+                            pass
 
                 if not scanned_images:
                     error = "Only PNG, JPG, JPEG, HEIC, and HEIF files are allowed."
@@ -91,10 +138,16 @@ def index():
                         format="PDF",
                         save_all=True,
                         append_images=other_images,
-                        resolution=100.0
+                        resolution=100.0,
+                        quality=85,
+                        optimize=True
                     )
 
                     pdf_file = pdf_filename
+
+                    # Release memory
+                    for image in scanned_images:
+                        image.close()
 
             except Exception as e:
                 print("ERROR:")
@@ -110,6 +163,10 @@ def index():
     )
 
 
+# =========================
+# DOWNLOAD ROUTE
+# =========================
+
 @app.route("/download/<filename>")
 def download(filename):
     return send_from_directory(
@@ -118,6 +175,10 @@ def download(filename):
         as_attachment=True
     )
 
+
+# =========================
+# RUN APP LOCALLY
+# =========================
 
 if __name__ == "__main__":
     app.run(debug=True)
