@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta 
+        name="viewport" 
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        ONETIME - Scan Notes to PDF
+    </title>
+
+    <link 
+        rel="stylesheet" 
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+    <main class="page">
+
+        <section class="card">
+
+            <div class="logo">
+
+                <div class="logo-icon">
+                    1
+                </div>
+
+                <span>
+                    ONETIME
+                </span>
+
+            </div>
+
+            <h1>
+                Turn Your Notes Into Clean PDF
+            </h1>
+
+            <p class="subtitle">
+                Upload your handwritten note images, 
+                scan them, and convert everything into 
+                one downloadable PDF.
+            </p>
+
+            <form 
+                method="POST" 
+                enctype="multipart/form-data"
+                onsubmit="showLoading()"
+            >
+
+                <input
+                    type="text"
+                    name="pdf_name"
+                    placeholder="Enter PDF name e.g. Biology Note"
+                    class="text-input"
+                >
+
+                <label class="upload-box">
+
+                    <input
+                        type="file"
+                        name="images"
+
+                        accept="
+                            image/png,
+                            image/jpeg,
+                            image/jpg,
+                            image/heic,
+                            image/heif,
+                            .heic,
+                            .heif
+                        "
+
+                        multiple
+                        required
+
+                        onchange="showFileCount(this)"
+                    >
+
+                    <div>
+
+                        <h3>
+                            Upload note images
+                        </h3>
+
+                        <p id="fileCount">
+                            Supports JPG, PNG, HEIC & HEIF
+                        </p>
+
+                    </div>
+
+                </label>
+
+                <button 
+                    type="submit"
+                    id="submitBtn"
+                >
+                    Scan & Create PDF
+                </button>
+
+            </form>
+
+            <div 
+                id="loading" 
+                class="loading hidden"
+            >
+
+                <div class="spinner"></div>
+
+                <p>
+                    Scanning and creating your PDF...
+                </p>
+
+            </div>
+
+            {% if error %}
+
+                <div class="message error">
+
+                    {{ error }}
+
+                </div>
+
+            {% endif %}
+
+            {% if pdf_file %}
+
+                <div class="message success">
+
+                    <h2>
+                        Your PDF is ready 🎉
+                    </h2>
+
+                    <a 
+                        href="/download/{{ pdf_file }}"
+                        class="download-btn"
+                    >
+                        Download PDF
+                    </a>
+
+                </div>
+
+            {% endif %}
+
+        </section>
+
+    </main>
+
+    <script>
+
+        function showLoading() {
+
+            document
+                .getElementById("loading")
+                .classList
+                .remove("hidden");
+
+            document
+                .getElementById("submitBtn")
+                .innerText = "Please wait...";
+        }
+
+        function showFileCount(input) {
+
+            const count = input.files.length;
+
+            document
+                .getElementById("fileCount")
+                .innerText =
+                    count + " image(s) selected";
+        }
+
+    </script>
+
+</body>
+</html>
