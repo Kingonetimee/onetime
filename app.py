@@ -135,18 +135,13 @@ def index():
 
 @app.route("/download/<filename>")
 def download(filename):
-    response = send_from_directory(
+    return send_from_directory(
         OUTPUT_FOLDER,
         filename,
         as_attachment=True,
-        mimetype="application/pdf"
+        mimetype="application/octet-stream",
+        download_name=filename
     )
-
-    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
-    response.headers["Content-Type"] = "application/pdf"
-
-    return response
-
 
 if __name__ == "__main__":
     app.run(debug=True)
