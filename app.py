@@ -4,10 +4,8 @@ import uuid
 
 from PIL import Image
 from pillow_heif import register_heif_opener
+from flask import Flask, render_template, request, send_from_directory, redirect, url_for
 
-from flask import Flask, render_template, request, send_from_directory
-
-# Enable HEIC and HEIF support
 register_heif_opener()
 
 app = Flask(__name__)
@@ -15,8 +13,8 @@ app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 OUTPUT_FOLDER = "outputs"
 
-MAX_IMAGES = 20
-MAX_IMAGE_SIZE = (1000, 1000)
+MAX_IMAGES = 10
+MAX_IMAGE_SIZE = (750, 750)
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -33,7 +31,7 @@ def clean_filename(name):
     return name or "onetime_document"
 
 
-def scan_image(image_path):
+def process_image(image_path):
     image = Image.open(image_path)
 
     if image.mode != "RGB":
@@ -46,7 +44,6 @@ def scan_image(image_path):
 
 @app.route("/", methods=["GET", "POST"])
 def index():
-    pdf_file = None
     error = None
 
     if request.method == "POST":
@@ -69,13 +66,13 @@ def index():
                     ".heif"
                 )
 
-                scanned_images = []
+                processed_images = []
                 saved_files = []
 
                 for file in files:
-                    original_filename = file.filename.lower()
+                    filename = file.filename.lower()
 
-                    if original_filename.endswith(allowed_formats):
+                    if filename.endswith(allowed_formats):
                         image_path = os.path.join(
                             UPLOAD_FOLDER,
                             f"{uuid.uuid4()}_{file.filename}"
@@ -84,10 +81,10 @@ def index():
                         file.save(image_path)
                         saved_files.append(image_path)
 
-                        scanned_image = scan_image(image_path)
-                        scanned_images.append(scanned_image)
+                        processed_image = process_image(image_path)
+                        processed_images.append(processed_image)
 
-                if not scanned_images:
+                if not processed_images:
                     error = "Only PNG, JPG, JPEG, HEIC, and HEIF files are allowed."
 
                 else:
@@ -97,8 +94,8 @@ def index():
                     pdf_filename = f"{safe_name}_{document_id}.pdf"
                     pdf_path = os.path.join(OUTPUT_FOLDER, pdf_filename)
 
-                    first_image = scanned_images[0]
-                    other_images = scanned_images[1:]
+                    first_image = processed_images[0]
+                    other_images = processed_images[1:]
 
                     first_image.save(
                         pdf_path,
@@ -108,16 +105,16 @@ def index():
                         append_images=other_images
                     )
 
-                    pdf_file = pdf_filename
-
-                    for image in scanned_images:
+                    for image in processed_images:
                         image.close()
 
-                for saved_file in saved_files:
-                    try:
-                        os.remove(saved_file)
-                    except Exception:
-                        pass
+                    for saved_file in saved_files:
+                        try:
+                            os.remove(saved_file)
+                        except Exception:
+                            pass
+
+                    return redirect(url_for("result", filename=pdf_filename))
 
             except Exception as e:
                 print("ERROR:")
@@ -128,8 +125,16 @@ def index():
 
     return render_template(
         "index.html",
-        pdf_file=pdf_file,
         error=error
+    )
+
+
+@app.route("/result/<filename>")
+def result(filename):
+    return render_template(
+        "index.html",
+        pdf_file=filename,
+        error=None
     )
 
 
@@ -142,6 +147,7 @@ def download(filename):
         mimetype="application/octet-stream",
         download_name=filename
     )
+
 
 if __name__ == "__main__":
     app.run(debug=True)
