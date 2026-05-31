@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+import time
 
 from PIL import Image
 from pillow_heif import register_heif_opener
@@ -13,8 +14,8 @@ app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 OUTPUT_FOLDER = "outputs"
 
-MAX_IMAGES = 10
-MAX_IMAGE_SIZE = (750, 750)
+MAX_IMAGES = 50
+MAX_IMAGE_SIZE = (900, 900)
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
@@ -31,6 +32,23 @@ def clean_filename(name):
     return name or "onetime_document"
 
 
+def cleanup_old_pdfs():
+    now = time.time()
+    lifetime = 60 * 60 * 24
+
+    for filename in os.listdir(OUTPUT_FOLDER):
+        file_path = os.path.join(OUTPUT_FOLDER, filename)
+
+        if os.path.isfile(file_path):
+            age = now - os.path.getmtime(file_path)
+
+            if age > lifetime:
+                try:
+                    os.remove(file_path)
+                except Exception:
+                    pass
+
+
 def process_image(image_path):
     image = Image.open(image_path)
 
@@ -44,6 +62,8 @@ def process_image(image_path):
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    cleanup_old_pdfs()
+
     error = None
 
     if request.method == "POST":
@@ -144,7 +164,7 @@ def download(filename):
         OUTPUT_FOLDER,
         filename,
         as_attachment=True,
-        mimetype="application/octet-stream",
+        mimetype="application/pdf",
         download_name=filename
     )
 

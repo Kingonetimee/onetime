@@ -8,9 +8,7 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>
-        ONETIME - Scan Notes to PDF
-    </title>
+    <title>ONETIME - Scan Notes to PDF</title>
 
     <link 
         rel="stylesheet" 
@@ -25,31 +23,20 @@
         <section class="card">
 
             <div class="logo">
-
-                <div class="logo-icon">
-                    1
-                </div>
-
-                <span>
-                    ONETIME
-                </span>
-
+                <div class="logo-icon">1</div>
+                <span>ONETIME</span>
             </div>
 
-            <h1>
-                Turn Your Notes Into Clean PDF
-            </h1>
+            <h1>Turn Your Notes Into Clean PDF</h1>
 
             <p class="subtitle">
-                Upload your handwritten note images, 
-                scan them, and convert everything into 
-                one downloadable PDF.
+                Upload your handwritten note images, compress them, and convert everything into one downloadable PDF.
             </p>
 
             <form 
+                id="pdfForm"
                 method="POST" 
                 enctype="multipart/form-data"
-                onsubmit="showLoading()"
             >
 
                 <input
@@ -62,84 +49,46 @@
                 <label class="upload-box">
 
                     <input
+                        id="imageInput"
                         type="file"
-                        name="images"
-
-                        accept="
-                            image/png,
-                            image/jpeg,
-                            image/jpg,
-                            image/heic,
-                            image/heif,
-                            .heic,
-                            .heif
-                        "
-
+                        accept="image/png, image/jpeg, image/jpg, image/heic, image/heif, .heic, .heif"
                         multiple
                         required
-
                         onchange="showFileCount(this)"
                     >
 
                     <div>
-
-                        <h3>
-                            Upload note images
-                        </h3>
-
-                        <p id="fileCount">
-                            Supports JPG, PNG, HEIC & HEIF
-                        </p>
-
+                        <h3>Upload note images</h3>
+                        <p id="fileCount">Supports JPG, PNG, HEIC & HEIF</p>
                     </div>
 
                 </label>
 
-                <button 
-                    type="submit"
-                    id="submitBtn"
-                >
+                <button type="submit" id="submitBtn">
                     Scan & Create PDF
                 </button>
 
             </form>
 
-            <div 
-                id="loading" 
-                class="loading hidden"
-            >
-
+            <div id="loading" class="loading hidden">
                 <div class="spinner"></div>
-
-                <p>
-                    Scanning and creating your PDF...
-                </p>
-
+                <p id="progressText">Preparing your images...</p>
             </div>
 
             {% if error %}
-
                 <div class="message error">
-
                     {{ error }}
-
                 </div>
-
             {% endif %}
 
             {% if pdf_file %}
-
                 <div class="message success">
+                    <h2>Your PDF is ready 🎉</h2>
 
-                    <h2>
-                        Your PDF is ready 🎉
-                    </h2>
-
-                   <a href="/download/{{ pdf_file }}" class="download-btn">
-                       Download PDF
+                    <a href="/download/{{ pdf_file }}" class="download-btn">
+                        Download PDF
                     </a>
                 </div>
-
             {% endif %}
 
         </section>
@@ -147,29 +96,142 @@
     </main>
 
     <script>
-
-        function showLoading() {
-
-            document
-                .getElementById("loading")
-                .classList
-                .remove("hidden");
-
-            document
-                .getElementById("submitBtn")
-                .innerText = "Please wait...";
-        }
+        const MAX_FILES = 50;
+        const MAX_WIDTH = 900;
+        const JPEG_QUALITY = 0.65;
 
         function showFileCount(input) {
-
             const count = input.files.length;
 
-            document
-                .getElementById("fileCount")
-                .innerText =
-                    count + " image(s) selected";
+            if (count > MAX_FILES) {
+                document.getElementById("fileCount").innerText =
+                    "Maximum " + MAX_FILES + " images allowed";
+
+                document.getElementById("submitBtn").disabled = true;
+                document.getElementById("submitBtn").innerText = "Too many images";
+                return;
+            }
+
+            document.getElementById("submitBtn").disabled = false;
+            document.getElementById("submitBtn").innerText = "Scan & Create PDF";
+
+            document.getElementById("fileCount").innerText =
+                count + " image(s) selected";
         }
 
+        async function compressImage(file, index, total) {
+            const progressText = document.getElementById("progressText");
+
+            progressText.innerText =
+                "Compressing image " + index + " of " + total + "...";
+
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+
+                reader.onload = function(event) {
+                    const img = new Image();
+
+                    img.onload = function() {
+                        const canvas = document.createElement("canvas");
+
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > MAX_WIDTH) {
+                            height = Math.round((height * MAX_WIDTH) / width);
+                            width = MAX_WIDTH;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+
+                        const ctx = canvas.getContext("2d");
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob(
+                            function(blob) {
+                                const compressedFile = new File(
+                                    [blob],
+                                    "compressed_" + index + ".jpg",
+                                    { type: "image/jpeg" }
+                                );
+
+                                resolve(compressedFile);
+                            },
+                            "image/jpeg",
+                            JPEG_QUALITY
+                        );
+                    };
+
+                    img.onerror = function() {
+                        // If browser cannot read HEIC/HEIF, send original file to backend
+                        resolve(file);
+                    };
+
+                    img.src = event.target.result;
+                };
+
+                reader.onerror = function() {
+                    resolve(file);
+                };
+
+                reader.readAsDataURL(file);
+            });
+        }
+
+        document.getElementById("pdfForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+
+            const input = document.getElementById("imageInput");
+            const files = Array.from(input.files);
+
+            if (files.length === 0) {
+                alert("Please upload at least one image.");
+                return;
+            }
+
+            if (files.length > MAX_FILES) {
+                alert("Maximum " + MAX_FILES + " images allowed.");
+                return;
+            }
+
+            document.getElementById("loading").classList.remove("hidden");
+            document.getElementById("submitBtn").disabled = true;
+            document.getElementById("submitBtn").innerText = "Please wait...";
+
+            const form = document.getElementById("pdfForm");
+            const formData = new FormData();
+
+            const pdfName = form.querySelector("input[name='pdf_name']").value;
+            formData.append("pdf_name", pdfName);
+
+            for (let i = 0; i < files.length; i++) {
+                const compressedFile = await compressImage(
+                    files[i],
+                    i + 1,
+                    files.length
+                );
+
+                formData.append("images", compressedFile);
+            }
+
+            document.getElementById("progressText").innerText =
+                "Creating your PDF...";
+
+            const response = await fetch("/", {
+                method: "POST",
+                body: formData
+            });
+
+            if (response.redirected) {
+                window.location.href = response.url;
+            } else {
+                const html = await response.text();
+                document.open();
+                document.write(html);
+                document.close();
+            }
+        });
     </script>
 
 </body>
