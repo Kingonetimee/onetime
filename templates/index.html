@@ -11,6 +11,21 @@
     <title>ONETIME - Scan Notes to PDF</title>
 
     <link 
+        rel="icon" 
+        href="{{ url_for('static', filename='favicon.ico') }}"
+    >
+
+    <link 
+        rel="apple-touch-icon" 
+        href="{{ url_for('static', filename='apple-touch-icon.png') }}"
+    >
+
+    <link 
+        rel="shortcut icon" 
+        href="{{ url_for('static', filename='favicon.ico') }}"
+    >
+
+    <link 
         rel="stylesheet" 
         href="{{ url_for('static', filename='style.css') }}"
     >
@@ -85,7 +100,11 @@
                 <div class="message success">
                     <h2>Your PDF is ready 🎉</h2>
 
-                    <a href="/download/{{ pdf_file }}" class="download-btn">
+                    <a 
+                        href="/download/{{ pdf_file }}" 
+                        class="download-btn"
+                        onclick="return handleDownload(this)"
+                    >
                         Download PDF
                     </a>
                 </div>
@@ -164,7 +183,6 @@
                     };
 
                     img.onerror = function() {
-                        // If browser cannot read HEIC/HEIF, send original file to backend
                         resolve(file);
                     };
 
@@ -232,6 +250,14 @@
                 document.close();
             }
         });
+
+        function handleDownload(link) {
+            setTimeout(() => {
+                window.location.href = "/";
+            }, 1500);
+
+            return true;
+        }
     </script>
 
 </body>
